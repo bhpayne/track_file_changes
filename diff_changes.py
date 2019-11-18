@@ -27,6 +27,32 @@ python3 -m pylint change_tracker.py
 # https://www.python.org/dev/peps/pep-0257/
 python3 -m doctest change_tracker.py
 
+************************
+
+input dataframes:
+
+file path     | hash    | status    | details
+-------------------------------------------------
+/path/to/file | a852b9f | see below | see below
+
+status can be 
+* duplicate
+* changed
+* moved
+* deleted
+* added
+
+Sequence of analysis:
+1) duplicate
+2) changed
+3) moved
+4) added or deleted
+
+If status==changed, then detail is old hash
+
+If status==moved, then detail is old path
+
+
 """
 
 import datetime # for JSON file name
@@ -60,7 +86,7 @@ def parse_args(list_of_args):
             email_addr = arg.replace('--email=', '')
     if not os.path.exists(path_to_json):
         raise Exception('ERROR: provided json path does not exist:', path_to_json)
-    if not os.path.exists(path_to_json):
+    if not os.path.exists(path_to_output):
         raise Exception('ERROR: provided output path does not exist:', path_to_output)
     return prnt_debug, path_to_json, path_to_output, email_addr
 
@@ -95,6 +121,7 @@ def get_latest_json(prnt_debug, list_of_json):
     import string
     dict_of_times = {}
     for json_file in list_of_json:
+        # https://stackoverflow.com/questions/1450897/remove-characters-except-digits-from-string-using-python
         date_to_parse = json_file.replace('.json', '').replace('_', '').translate(str.maketrans('', '', string.ascii_letters))
         dict_of_times[json_file] = datetime.datetime.strptime(date_to_parse, "%Y-%m-%dT%H-%M")
     # https://www.w3resource.com/python-exercises/dictionary/python-data-type-dictionary-exercise-15.php
@@ -116,12 +143,15 @@ def find_duplicate_files(prnt_debug, df):
     df_dupes = df[df.duplicated(subset='hash of file', keep=False)]
     if df_dupes.shape[0] > 0:
         print('duplicate files (based on hash)')
-        for hashh in set(df_dupes['hash of file'].values):
-            print('hash: ',hashh)
-            path_series = df_dupes[df_dupes['hash of file']==hashh]['full path']
+        for this_hash in set(df_dupes['hash of file'].values):
+            print('hash: ',this_hash)
+            path_series = df_dupes[df_dupes['hash of file']==this_hash]['full path']
             for idx, this_path in path_series.items():
                 print(this_path)
-    return
+            df['status'] = np.where(df['hash of file'] == this_hash, 'duplicate', '')
+
+    df_no_dupes = df[df['status']!='duplicate']
+    return df_no_dupes
 
 def df_comparison_changed_files(prnt_debug, df_previous, df_current):
     """
@@ -216,7 +246,7 @@ if __name__ == '__main__':
     df_previous = pandas.read_json(second_latest_json_file)
     df_current = pandas.DataFrame(latest_json_file)
 
-    find_duplicate_files(prnt_debug, df_current)
+    df_with_status = find_duplicate_files(prnt_debug, df_current)
 
 
     print('detecting changes')
