@@ -123,7 +123,7 @@ def get_latest_json(prnt_debug, list_of_json):
     for json_file in list_of_json:
         # https://stackoverflow.com/questions/1450897/remove-characters-except-digits-from-string-using-python
         date_to_parse = json_file.replace('.json', '').replace('_', '').translate(str.maketrans('', '', string.ascii_letters))
-        dict_of_times[json_file] = datetime.datetime.strptime(date_to_parse, "%Y-%m-%dT%H-%M")
+        dict_of_times[json_file] = datetime.datetime.strptime(date_to_parse, "%Y-%m-%d%H-%M")
     # https://www.w3resource.com/python-exercises/dictionary/python-data-type-dictionary-exercise-15.php
     latest_json_file = max(dict_of_times.keys(), key=(lambda k: dict_of_times[k]))
     del dict_of_times[latest_json_file]
