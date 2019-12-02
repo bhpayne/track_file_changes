@@ -8,5 +8,7 @@ path_to_json="."
 
 ./rolling_logs.py --path_to_json=${path_to_json}  --number_to_keep="3"
 
+./find_dupes.py --path_to_json=${path_to_json}
+
 # email here
 

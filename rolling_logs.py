@@ -68,13 +68,12 @@ def parse_args(list_of_args):
         raise Exception('ERROR: provided json path does not exist:', path_to_json)
     return prnt_debug, path_to_json, number_to_keep
 
-def args_use(list_of_args):
+def args_use(prnt_debug, list_of_args):
     """
     >>> args_use(['name of file'])
 
     >>> args_use(['name_of_py', '--debug'])
     """
-    prnt_debug = False
     path_to_search = ''
     if len(list_of_args) == 1:
         print('invalid number of arguments')
@@ -104,9 +103,13 @@ def identify_logs_to_delete(prnt_debug, list_of_json_files, number_to_keep):
     # https://www.w3resource.com/python-exercises/dictionary/python-data-type-dictionary-exercise-15.php
 
     list_of_files_to_delete = []
+    keep_indx = 0
     while len(dict_of_times)>0:
+        keep_indx += 1
         latest_json_file = max(dict_of_times.keys(), key=(lambda k: dict_of_times[k]))
-        if len(dict_of_times)>number_to_keep+1:
+        if prnt_debug: print('latest_json_file:',latest_json_file)
+
+        if keep_indx <= number_to_keep:
             if prnt_debug: print('keeping',latest_json_file)
             pass
         else:
@@ -121,6 +124,8 @@ def delete_old_logs(prnt_debug, path_to_json, number_to_keep):
     """
     list_of_json_files = glob.glob(path_to_json+'/*.json')
 
+    if prnt_debug: print('list of json files:', list_of_json_files)
+ 
     if len(list_of_json_files) > 1:
         list_of_files = identify_logs_to_delete(prnt_debug, list_of_json_files, number_to_keep) 
     else:
@@ -128,6 +133,7 @@ def delete_old_logs(prnt_debug, path_to_json, number_to_keep):
         sys.exit(0)
 
     for this_file in list_of_files:
+        if prnt_debug: print('delete',this_file)
         try:
             os.remove(this_file)
         except:
@@ -136,7 +142,7 @@ def delete_old_logs(prnt_debug, path_to_json, number_to_keep):
 
 if __name__ == '__main__':
 
-    prnt_debug, path_to_json, number_to_keep  = args_use(sys.argv)
+    prnt_debug, path_to_json, number_to_keep  = args_use(False, sys.argv)
 
     delete_old_logs(prnt_debug, path_to_json, number_to_keep)
 

@@ -61,7 +61,8 @@ import sys
 import os
 import hashlib # hash of file
 import pandas
-import change_tracker as ct
+#import change_tracker as ct
+import numpy as np
 
 def parse_args(list_of_args):
     """
@@ -122,7 +123,7 @@ def get_latest_json(prnt_debug, list_of_json):
     dict_of_times = {}
     for json_file in list_of_json:
         # https://stackoverflow.com/questions/1450897/remove-characters-except-digits-from-string-using-python
-        date_to_parse = json_file.replace('.json', '').replace('_', '').translate(str.maketrans('', '', string.ascii_letters))
+        date_to_parse = json_file.replace('.json', '').replace('_', '').replace('/','').replace('.','').translate(str.maketrans('', '', string.ascii_letters))
         dict_of_times[json_file] = datetime.datetime.strptime(date_to_parse, "%Y-%m-%d%H-%M")
     # https://www.w3resource.com/python-exercises/dictionary/python-data-type-dictionary-exercise-15.php
     latest_json_file = max(dict_of_times.keys(), key=(lambda k: dict_of_times[k]))
@@ -132,26 +133,6 @@ def get_latest_json(prnt_debug, list_of_json):
     if prnt_debug: print('second latest:', second_latest_json_file)
     return latest_json_file, second_latest_json_file
 
-def find_duplicate_files(prnt_debug, df):
-    """
-    this is for a single crawl of the directory -- no comparison with previous JSON records needed
-
-    https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.duplicated.html
-
-    >>> find_duplicate_files(False, [{'hash of file':'asdfmagin'}])
-    """
-    df_dupes = df[df.duplicated(subset='hash of file', keep=False)]
-    if df_dupes.shape[0] > 0:
-        print('duplicate files (based on hash)')
-        for this_hash in set(df_dupes['hash of file'].values):
-            print('hash: ',this_hash)
-            path_series = df_dupes[df_dupes['hash of file']==this_hash]['full path']
-            for idx, this_path in path_series.items():
-                print(this_path)
-            df['status'] = np.where(df['hash of file'] == this_hash, 'duplicate', '')
-
-    df_no_dupes = df[df['status']!='duplicate']
-    return df_no_dupes
 
 def df_comparison_changed_files(prnt_debug, df_previous, df_current):
     """
@@ -173,9 +154,13 @@ def df_comparison_changed_files(prnt_debug, df_previous, df_current):
         print('changed files:')
         for index, row in df_altered.iterrows():
             print(row['full path'])
-            list_of_changed_hashes.append(row['hash of file_current'])
-            list_of_changed_hashes.append(row['hash of file_previous'])
-    return list_of_changed_hashes
+
+            df_current = df_current[df_current['full path'] != row['full path']]
+            df_previous = df_previous[df_previous['full path'] != row['full path']]
+
+#            list_of_changed_hashes.append(row['hash of file_current'])
+#            list_of_changed_hashes.append(row['hash of file_previous'])
+    return df_previous, df_current
 
 def df_comparison_moved_files(prnt_debug, df_previous, df_current):
     """
@@ -192,14 +177,18 @@ def df_comparison_moved_files(prnt_debug, df_previous, df_current):
 
     list_of_moved_hashes = []
     if df_moved.shape[0] > 0:
-        print("moved file:")
+        print("== moved files ==")
         # https://stackoverflow.com/questions/16476924/how-to-iterate-over-rows-in-a-dataframe-in-pandas
         for index, row in df_moved.iterrows():
             print(row['full path_previous'], '-->', row['full path_current'])
-            list_of_moved_hashes.append(row['hash of file'])
-    return list_of_moved_hashes
 
-def df_comparison_new_and_deleted_files(prnt_debug, df_previous, df_current, list_of_moved_hashes):
+            df_current = df_current[df_current['full path'] != row['full path_current']]
+            df_previous = df_previous[df_previous['full path'] != row['full path_previous']]
+
+#            list_of_moved_hashes.append(row['hash of file'])
+    return df_previous, df_current
+
+def df_comparison_new_and_deleted_files(prnt_debug, df_previous, df_current):
     """
     # find files that were added and files that were removed
     # file added:    new hash,       new path
@@ -218,19 +207,30 @@ def df_comparison_new_and_deleted_files(prnt_debug, df_previous, df_current, lis
     df_deleted_files = df_merged_all[df_merged_all['_merge'] == 'right_only']
 
     if df_new_files.shape[0] > 0:
-        print('new files:')
+        print('== new files ==')
         # https://stackoverflow.com/questions/16476924/how-to-iterate-over-rows-in-a-dataframe-in-pandas
         for index, row in df_new_files.iterrows():
-            if row['hash of file'] not in list_of_moved_hashes:
-                print(row['full path'])
+            print(row['full path'])
 
     if df_deleted_files.shape[0] > 0:
-        print('deleted files:')
+        print('== deleted files ==')
         # https://stackoverflow.com/questions/16476924/how-to-iterate-over-rows-in-a-dataframe-in-pandas
         for index, row in df_deleted_files.iterrows():
-            if row['hash of file'] not in list_of_moved_hashes:
-                print(row['full path'])
+            print(row['full path'])
     return
+
+my_str = """
+import diff_changes as dc
+import pandas
+import glob
+prnt_debug = False
+path_to_json = '.' 
+path_to_output = '.'
+list_of_json_files = glob.glob(path_to_json+'/*.json')
+latest_json_file, second_latest_json_file = dc.get_latest_json(prnt_debug, list_of_json_files)
+df_previous = pandas.read_json(second_latest_json_file)
+df_current = pandas.read_json(latest_json_file)
+"""
 
 if __name__ == '__main__':
 
@@ -243,13 +243,12 @@ if __name__ == '__main__':
         print("need at least two previous JSON files. Exiting.")
         sys.exit(0)
 
+    # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_json.html 
     df_previous = pandas.read_json(second_latest_json_file)
-    df_current = pandas.DataFrame(latest_json_file)
-
-    df_with_status = find_duplicate_files(prnt_debug, df_current)
+    df_current = pandas.read_json(latest_json_file)
 
 
-    print('detecting changes')
+    #print('== detecting changes ==')
     # options:
     # file added:    new hash,     new path
     # file removed:  missing hash, missing path
@@ -257,14 +256,24 @@ if __name__ == '__main__':
     # file moved, aka renamed:    same hash,     new path
     # file changed:  changed hash (new hash and missing hash for same same path)
 
-    # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_json.html 
-    df_previous = pandas.read_json(latest_json_file)
-    df_current = pandas.DataFrame(list_of_dicts)
+    # https://stackoverflow.com/questions/9758450/pandas-convert-dataframe-to-array-of-tuples/9762084
+    current_tuples = [tuple(x) for x in df_current.values]
+    previous_tuples = [tuple(x) for x in df_previous.values]
 
-    list_of_changed_hashes = df_comparison_changed_files(prnt_debug, df_previous, df_current)
+    unchanged_tuples = set(current_tuples).intersection(set(previous_tuples))
+    # remove unchanged_tuples from both current_tuples and previous_tuples
+    df_current_to_cat  = pandas.DataFrame(list(set(current_tuples)  - unchanged_tuples), columns=['full path','hash of file'])
+    df_previous_to_cat = pandas.DataFrame(list(set(previous_tuples) - unchanged_tuples), columns=['full path','hash of file'])
+#    print('after removing "no change" files, current df is',df_current_to_cat.shape)
+#    print('after removing "no change" files, prev    df is',df_previous_to_cat.shape)
 
-    list_of_moved_hashes = df_comparison_moved_files(prnt_debug, df_previous, df_current) 
+    df_previous_to_cat, df_current_to_cat = df_comparison_changed_files(prnt_debug, df_previous_to_cat, df_current_to_cat)
+#    print('after detecting changes, current df is',df_current_to_cat.shape)
+#    print('after detecting changes, prev    df is',df_previous_to_cat.shape)
 
-    hashes_to_ignore = list_of_changed_hashes + list_of_moved_hashes
-    df_comparison_new_and_deleted_files(prnt_debug, df_previous, df_current, hashes_to_ignore)
+    df_previous_to_cat, df_current_to_cat = df_comparison_moved_files(prnt_debug, df_previous_to_cat, df_current_to_cat)
+#    print('after moved files, current df is',df_current_to_cat.shape)
+#    print('after moved files, prev    df is',df_previous_to_cat.shape)
+
+    df_comparison_new_and_deleted_files(prnt_debug, df_previous_to_cat, df_current_to_cat)
 
