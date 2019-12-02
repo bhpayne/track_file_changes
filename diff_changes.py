@@ -29,11 +29,15 @@ python3 -m doctest change_tracker.py
 
 ************************
 
-input dataframes:
 
-file path     | hash    | status    | details
--------------------------------------------------
-/path/to/file | a852b9f | see below | see below
+current       | current | previous      | previous |
+file path     | hash    | file path     | hash     | status 
+-------------------------------------------------------------------
+/path/to/file | abcd    | /path/to/file | abcd     | no change, no move
+/pgin/gin/gi  | gingia  | /pgin/gin/gi  | ingna    | file changed
+/p/t/f        | 1234    | /a/b/c        | 1234     | file moved
+/pa/to/fi     | 992d    | NaN           | NaN      | file added
+NaN           | NaN     | /ag/ggn/g9jgn | 9g9248   | file deleted
 
 status can be 
 * duplicate
@@ -47,11 +51,6 @@ Sequence of analysis:
 2) changed
 3) moved
 4) added or deleted
-
-If status==changed, then detail is old hash
-
-If status==moved, then detail is old path
-
 
 """
 
